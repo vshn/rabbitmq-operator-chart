@@ -1,0 +1,71 @@
+name: Smoke test
+on:
+  pull_request:
+  push:
+  workflow_dispatch: {}
+
+
+env:
+  HELM_IMAGE: ghcr.io/appuio/helm-v4
+  # renovate: datasource=docker depName=ghcr.io/appuio/helm-v4
+  HELM_VERSION: 4.1.0
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Start Minikube
+        uses: medyagh/setup-minikube@e9e035a86bbc3caea26a450bd4dbf9d0c453682e # v0.0.21
+
+      - name: Set up Helm
+        run: |
+          mkdir -p ~/.config/helm/registry/
+          echo "{}" > ~/.config/helm/registry/config.json
+
+      - name: Lint
+        run: scripts/helm-docker.sh lint .
+
+      - name: Template default
+        run: scripts/helm-docker.sh template test .
+
+      - name: Install CRD chart
+        run: |
+          scripts/helm-docker.sh install crd oci://ghcr.io/vshn/rabbitmq-crd-chart/rabbitmq-crd --version "$RABBITMQ_CRD_CHART_VERSION" --wait --timeout 5m --create-namespace --namespace rabbitmq-system
+        env:
+          # renovate: datasource=docker depName=ghcr.io/vshn/rabbitmq-crd-chart/rabbitmq-crd
+          RABBITMQ_CRD_CHART_VERSION: 0.0.1
+
+      - name: Install chart
+        run: scripts/helm-docker.sh install test . --wait --timeout 10m --create-namespace --namespace rabbitmq-system
+
+      - name: Wait for operators
+        run: |
+          kubectl wait --for=condition=available deployment/rabbitmq-cluster-operator -n rabbitmq-system --timeout=600s
+
+      - name: Test all test-value-files
+        run: |
+          failed=false
+          for i in test/test-value-files/*.yaml; do
+            set +e
+            scripts/helm-docker.sh upgrade test . --wait --timeout 10m --create-namespace --namespace rabbitmq-system -f $i
+            if [ $? -ne 0 ]; then
+              failed=true
+            fi
+            kubectl wait --for=condition=available deployment/rabbitmq-cluster-operator -n rabbitmq-system --timeout=600s
+            set -e
+            if [ $? -ne 0 ]; then
+              failed=true
+            fi
+          done
+          if [ "$failed" = true ]; then
+            exit 1
+          fi
+
+      - name: Uninstall chart
+        run: scripts/helm-docker.sh uninstall test -n rabbitmq-system --wait
+
+      - name: Assert CRDs retained
+        run: |
+          kubectl get crd rabbitmqclusters.rabbitmq.com

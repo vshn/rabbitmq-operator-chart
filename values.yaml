@@ -1,0 +1,17 @@
+clusterOperator:
+  image:
+    registry: ghcr.io
+    repository: rabbitmq/cluster-operator
+  env:
+    # OPERATOR_SCOPE_NAMESPACE: rabbitmq-dev1, rabbitmq-dev2
+  podSecurityContext:
+    enabled: false
+  containerSecurityContext:
+    enabled: false
+rabbitmqImage:
+  registry: docker.io
+  repository: bitnamilegacy/rabbitmq
+  version: 3.11.26-debian-11-r0
+credentialUpdaterImage:
+  registry: docker.io
+  repository: bitnamilegacy/rmq-default-credential-updater
