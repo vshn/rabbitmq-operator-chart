@@ -35,10 +35,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        - name: DEFAULT_RABBITMQ_IMAGE
-          value: "{{ .Values.rabbitmqImage.registry }}/{{ .Values.rabbitmqImage.repository }}:{{ .Values.rabbitmqImage.version }}"
-        - name: DEFAULT_USER_UPDATER_IMAGE
-          value: "{{ .Values.credentialUpdaterImage.registry }}/{{ .Values.credentialUpdaterImage.repository }}"
         - name: ENABLE_WEBHOOKS
           value: "false"
         {{- if .Values.clusterOperator.env }}
